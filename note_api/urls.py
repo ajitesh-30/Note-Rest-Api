@@ -5,5 +5,7 @@ from note_api import views
 urlpatterns =[
 	url(r'^note/(?P<pk>[0-9]+)',views.NoteDetailView.as_view(),name='note-detail'),
 	url(r'^note/',views.NoteList.as_view(),name='notes-list'),
-	url(r'^api-token-auth/',rest_framework_views.obtain_auth_token,name='generate_key'),
+	url(r'^generate/',views.Login.as_view(),name='login'),
+	url(r'^signup/',views.Register.as_view(),name='signup'),
+	#url(r'^generate/',views.GenerateView.as_view(),name='generate_key'),
 ]

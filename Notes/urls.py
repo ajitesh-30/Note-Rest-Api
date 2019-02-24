@@ -19,5 +19,4 @@ from django.conf.urls import url,include
 urlpatterns = [
     url(r'^admin/', admin.site.urls),
     url(r'^api/',include('note_api.urls')),
-    url(r'^api-token-auth/',obtain_auth_token,name='api-auth-token'),
 ]
