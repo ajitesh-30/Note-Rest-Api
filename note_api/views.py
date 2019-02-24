@@ -6,6 +6,7 @@ from django.contrib.auth import authenticate
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.authtoken.models import Token
 from google.cloud import translate
+from rest_framework import permissions
 from rest_framework.authentication import SessionAuthentication,BasicAuthentication,TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -61,15 +62,17 @@ class Translation(APIView):
 		x=serializer['name']
 		y=serializer['description']
 		target='hi'
-		translated_name = translate_client.translate(x,target_language=target)
-		print(translated_name)
-		translated_description = translate_client.translate(y,target_language=target)
+		translated_description = translate_client.translate(y,target_language='hi')
+		print(translated_description)
 		serializer['description']=translated_description['translatedText']
-		serializer['name']=translated_name['translatedText']
+		translated_description = translate_client.translate(x,target_language='hi')
+		print(translated_description)	
+		serializer['name']=translated_description['translatedText']
 		return Response(serializer)
 
 
 class NoteList(APIView):
+	permission_classes = (permissions.IsAuthenticatedOrReadOnly,)
 	def get(self,request,format=None):
 		token,created = Token.objects.get_or_create(user=self.request.user)
 		notes = Note.objects.filter(creater=token.key)
@@ -86,6 +89,7 @@ class NoteList(APIView):
 
 
 class NoteDetailView(APIView):
+	permission_classes = (permissions.IsAuthenticatedOrReadOnly,)
 	def get_object(self,pk):
 		try:
 			return Note.objects.get(pk=pk)
