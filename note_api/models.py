@@ -9,7 +9,8 @@ class Note(models.Model):
 	name = models.CharField(max_length=100)
 	description = models.CharField(max_length=500)
 	created_at = models.DateTimeField(default=timezone.now)
-	creater = models.ForeignKey('auth.user',on_delete=models.CASCADE)
+	creater = models.CharField(default=None,max_length=100,null=True)
+
 	def __str__(self):
 		return self.name
 
