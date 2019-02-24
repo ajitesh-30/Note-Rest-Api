@@ -6,7 +6,7 @@ from django.utils import timezone
 from django.conf import settings
 
 class Note(models.Model):
-	name = models.CharField(max_length=100)
+	name = models.CharField(default=None,max_length=100,null=True)
 	description = models.CharField(max_length=500)
 	created_at = models.DateTimeField(default=timezone.now)
 	creater = models.CharField(default=None,max_length=100,null=True)

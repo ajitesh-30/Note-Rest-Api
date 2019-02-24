@@ -8,5 +8,4 @@ urlpatterns =[
 	url(r'^note/',views.NoteList.as_view(),name='notes-list'),
 	url(r'^generate/',views.Login.as_view(),name='login'),
 	url(r'^signup/',views.Register.as_view(),name='signup'),
-	#url(r'^generate/',views.GenerateView.as_view(),name='generate_key'),
 ]

@@ -58,17 +58,18 @@ class Translation(APIView):
 		translate_client = translate.Client()
 		notes   = self.get_object(pk=pk)
 		serializer = NoteSerializer(notes).data
-		x=serializer[0]['description']
-		y=serializer[0]['name']
+		x=serializer['name']
+		y=serializer['description']
 		target='hi'
-		serializer[0]['description'] = translate_client.translate(x,target_language=target)
-		serializer[0]['name'] = translate_client.translate(y,target_language=target)
+		translated_name = translate_client.translate(x,target_language=target)
+		print(translated_name)
+		translated_description = translate_client.translate(y,target_language=target)
+		serializer['description']=translated_description['translatedText']
+		serializer['name']=translated_name['translatedText']
 		return Response(serializer)
 
 
 class NoteList(APIView):
-	#authentication_classes = (TokenAuthentication,)
-	#permission_classes = (IsAuthenticated,)
 	def get(self,request,format=None):
 		token,created = Token.objects.get_or_create(user=self.request.user)
 		notes = Note.objects.filter(creater=token.key)
@@ -85,8 +86,6 @@ class NoteList(APIView):
 
 
 class NoteDetailView(APIView):
-	#authentication_classes = (TokenAuthentication,)
-	#permission_classes = (IsAuthenticated,)
 	def get_object(self,pk):
 		try:
 			return Note.objects.get(pk=pk)
