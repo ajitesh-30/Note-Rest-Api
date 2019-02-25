@@ -7,8 +7,9 @@ from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.authtoken.models import Token
 from google.cloud import translate
 from rest_framework import permissions
+import json
 from rest_framework.authentication import SessionAuthentication,BasicAuthentication,TokenAuthentication
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated,AllowAny
 from rest_framework.response import Response
 from django.contrib.auth.models import User
 from django.shortcuts import get_object_or_404
@@ -17,6 +18,7 @@ from .models import Note
 
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"]=os.getcwd()+"/translate.json"
 class Register(APIView):
+	permission_classes = (AllowAny,)
 	def post(self,request):
 		password1 = request.data.get('password1')
 		password2 = request.data.get('password2')
@@ -34,8 +36,8 @@ class Register(APIView):
 				return Response({"message":"Unable to create User"},status=status.HTTP_400_BAD_REQUEST)
 		else:
 			return Response({"message":"Please provide correct details"},status=status.HTTP_400_BAD_REQUEST)
-
 class Login(APIView):
+	permission_classes = (AllowAny,)
 	def post(self,request):
 		username = request.data.get('username')
 		password = request.data.get('password')
@@ -50,6 +52,9 @@ class Login(APIView):
 			return Response({"message":"Something Went Wrong"},status=status.HTTP_400_BAD_REQUEST)
 
 class Translation(APIView):
+
+	authentication_classes = (TokenAuthentication,)
+	permission_classes = (IsAuthenticated,)
 	def get_object(self,pk):
 		try:
 			return Note.objects.get(pk=pk)
@@ -72,10 +77,13 @@ class Translation(APIView):
 
 
 class NoteList(APIView):
-	permission_classes = (permissions.IsAuthenticatedOrReadOnly,)
+	authentication_classes = (TokenAuthentication,)
+	permission_classes = (IsAuthenticated,)
+
 	def get(self,request,format=None):
 		token,created = Token.objects.get_or_create(user=self.request.user)
 		notes = Note.objects.filter(creater=token.key)
+		print(notes)
 		data = NoteSerializer(notes,many=True).data
 		return Response({"objects":data})
 
@@ -87,23 +95,25 @@ class NoteList(APIView):
 			return Response(serializer.data,status=status.HTTP_201_CREATED)
 		return Response(serializer.errors,status=status.HTTP_400_BAD_REQUEST)
 
-
 class NoteDetailView(APIView):
-	permission_classes = (permissions.IsAuthenticatedOrReadOnly,)
+	authentication_classes = (TokenAuthentication,)
+	permission_classes = (IsAuthenticated,)
 	def get_object(self,pk):
 		try:
 			return Note.objects.get(pk=pk)
 		except Note.DoesNotExist:
 			raise Http404	
+
 	def get(self,request,pk):
 		notes   = self.get_object(pk=pk)
+		print(notes)
 		serializer = NoteSerializer(notes).data
 		return Response(serializer)
 
 	def patch(self,request,pk,format=None):
 		serializer = self.get_object(pk=pk)
 		serializer = NoteSerializer(serializer,data=request.data).data
-		token,created = Token.objects.get_or_create(user=self.request.user)
+		token,created = Token.objects.get_or_create(user=request.user)
 		if serializer.is_valid():
 			serializer.save(creater=self.request.user)
 			return Response(serializer.data)
