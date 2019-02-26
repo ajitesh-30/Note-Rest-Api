@@ -1,4 +1,8 @@
 class Notes(object):
-	def __init__(self,**kwargs):
-		for field in ('id','name','description','creater'):
-			setattr(self,field,kwargs.get(field,None))
+	def __init__(self,id,name,description,creater=None):
+		self.id = 0
+		self.name = name
+		self.description = description
+
+n = Notes(id=1,name='This is test note',description='Test note description')
+

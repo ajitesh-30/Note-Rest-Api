@@ -15,11 +15,15 @@ from django.contrib.auth.models import User
 from django.shortcuts import get_object_or_404
 from .serializers import NoteSerializer
 from .models import Note
+import functools
 
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"]=os.getcwd()+"/translate.json"
 class Register(APIView):
+
 	permission_classes = (AllowAny,)
+
 	def post(self,request):
+
 		password1 = request.data.get('password1')
 		password2 = request.data.get('password2')
 		username  = request.data.get('username')
@@ -31,13 +35,18 @@ class Register(APIView):
 					return Response({"message":"This user already exists","flag":False},status=status.HTTP_400_BAD_REQUEST)
 				user = User.objects.create_user(username=username,password=password1)
 				user.is_active=True
+				with open(user.username+".json", "w") as write_file:
+				    json.dump([], write_file)
 				return Response({"message":"User Created","flag":True},status=status.HTTP_201_CREATED)
 			except:
 				return Response({"message":"Unable to create User"},status=status.HTTP_400_BAD_REQUEST)
 		else:
 			return Response({"message":"Please provide correct details"},status=status.HTTP_400_BAD_REQUEST)
+
 class Login(APIView):
+
 	permission_classes = (AllowAny,)
+
 	def post(self,request):
 		username = request.data.get('username')
 		password = request.data.get('password')
@@ -55,11 +64,13 @@ class Translation(APIView):
 
 	authentication_classes = (TokenAuthentication,)
 	permission_classes = (IsAuthenticated,)
+
 	def get_object(self,pk):
 		try:
 			return Note.objects.get(pk=pk)
 		except Note.DoesNotExist:
 			raise Http404	
+
 	def get(self,request,pk):
 		translate_client = translate.Client()
 		notes   = self.get_object(pk=pk)
@@ -77,48 +88,72 @@ class Translation(APIView):
 
 
 class NoteList(APIView):
+
 	authentication_classes = (TokenAuthentication,)
 	permission_classes = (IsAuthenticated,)
 
 	def get(self,request,format=None):
 		token,created = Token.objects.get_or_create(user=self.request.user)
-		notes = Note.objects.filter(creater=token.key)
-		print(notes)
-		data = NoteSerializer(notes,many=True).data
-		return Response({"objects":data})
+		file=open(self.request.user.username+".json","r")
+		file_data=json.load(file)
+		return Response({"objects":file_data})
 
 	def post(self,request):
 		serializer = NoteSerializer(data=request.data)
+		data = request.data
 		if serializer.is_valid():
+			data=dict()
 			token,created = Token.objects.get_or_create(user=self.request.user)
-			serializer.save(creater=token.key)
+			data.update(serializer.data)
+			data['creater']=token.key
+			file=open(self.request.user.username+".json","r")
+			file_data=json.load(file)
+			data['id']=len(file_data)+1
+			file_data.append(data)
+			file.close()
+			file=open(self.request.user.username+".json","w")
+			json.dump(file_data,file,indent=4)
+			file.close()			
 			return Response(serializer.data,status=status.HTTP_201_CREATED)
 		return Response(serializer.errors,status=status.HTTP_400_BAD_REQUEST)
 
 class NoteDetailView(APIView):
+
 	authentication_classes = (TokenAuthentication,)
 	permission_classes = (IsAuthenticated,)
+
 	def get_object(self,pk):
 		try:
-			return Note.objects.get(pk=pk)
-		except Note.DoesNotExist:
-			raise Http404	
+			file=open(self.request.user.username+".json","r")
+			file_data=json.load(file)
+			x = filter(lambda x : x['id']==int(pk),file_data) 
+			file.close()
+			return list(x)[0]
+		except :
+			return {"message":"Note Does Not Exists"}	
 
 	def get(self,request,pk):
 		notes   = self.get_object(pk=pk)
-		print(notes)
-		serializer = NoteSerializer(notes).data
-		return Response(serializer)
+		return Response(notes)
 
 	def patch(self,request,pk,format=None):
 		serializer = self.get_object(pk=pk)
-		serializer = NoteSerializer(serializer,data=request.data).data
 		token,created = Token.objects.get_or_create(user=request.user)
-		if serializer.is_valid():
-			serializer.save(creater=self.request.user)
-			return Response(serializer.data)
-		return Response(serializer.errors,status=status.HTTP_400_BAD_REQUEST)
-
+		file=open(self.request.user.username+".json","r")
+		file_data=json.load(file)
+		file.close()
+		data_changed={"message":"No data found"}
+		for i in file_data:
+			if i['id']==int(pk):
+				i['description']=request.data.get("description")
+				i['name']=request.data.get("name")
+				data_changed=i
+				break
+		file=open(self.request.user.username+".json","w")
+		json.dump(file_data,file,indent=4)
+		file.close()				
+		return Response(data_changed,status=status.HTTP_400_BAD_REQUEST)
+	
 	def delete(self,request,pk,format=None):
 		note = self.get_object(pk)
 		note.delete()

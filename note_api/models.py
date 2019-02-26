@@ -10,7 +10,6 @@ class Note(models.Model):
 	description = models.CharField(max_length=500)
 	created_at = models.DateTimeField(default=timezone.now)
 	creater = models.CharField(default=None,max_length=100,null=True)
-
 	def __str__(self):
 		return self.name
 
