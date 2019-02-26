@@ -14,22 +14,24 @@ from rest_framework.response import Response
 from django.contrib.auth.models import User
 from django.shortcuts import get_object_or_404
 from .serializers import NoteSerializer
-from .models import Note
 import functools
 
 
+#For translation
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"]=os.getcwd()+"/translate.json"
 translate_client = translate.Client()
+
+#Creating New User
 class Register(APIView):
 
 	permission_classes = (AllowAny,)
 
 	def post(self,request):
 
+		username  = request.data.get('username')
 		password1 = request.data.get('password1')
 		password2 = request.data.get('password2')
-		username  = request.data.get('username')
-
+		
 		if password1 and password2 and username and password1==password2:
 			try:
 				user_exists = User.objects.filter(username=username).exists()
@@ -37,17 +39,21 @@ class Register(APIView):
 					return Response({"message":"This user already exists","flag":False},status=status.HTTP_400_BAD_REQUEST)
 				user = User.objects.create_user(username=username,password=password1)
 				user.is_active=True
+				#Creates a json file for each new user having all its notes
 				with open(os.getcwd()+"/static/"+user.username+".json", "w") as write_file:
 				    json.dump([], write_file)
 
+				#Creates a json file for storing translation of each note created above
 				with open(os.getcwd()+"/static/"+user.username+"_translation.json", "w") as write_file:
 				    json.dump([], write_file)
+
 				return Response({"message":"User Created","flag":True},status=status.HTTP_201_CREATED)
 			except:
 				return Response({"message":"Unable to create User"},status=status.HTTP_400_BAD_REQUEST)
 		else:
 			return Response({"message":"Please provide correct details"},status=status.HTTP_400_BAD_REQUEST)
 
+#Logs in the user and creates the token(URL : /api/generate/)
 class Login(APIView):
 
 	permission_classes = (AllowAny,)
@@ -58,6 +64,7 @@ class Login(APIView):
 		try:
 			user_obj = authenticate(username=username,password=password)
 			if user_obj:
+				#Token creation for each logged in user
 				token,created = Token.objects.get_or_create(user=user_obj)
 				return Response({"api_key":token.key},status=status.HTTP_200_OK)
 			else:
@@ -71,9 +78,12 @@ class Translation(APIView):
 	permission_classes = (IsAuthenticated,)
 
 	def get_object(self,pk):
+
 		try:
+
 			file=open(os.getcwd()+"/static/"+self.request.user.username+"_translation.json","r")
 			file_data=json.load(file)
+			#Get the requested note from all notes by user
 			x = filter(lambda x : x['id']==int(pk),file_data) 
 			file.close()
 			return list(x)[0]
@@ -81,6 +91,7 @@ class Translation(APIView):
 			return {"message":"Note Does Not Exists"}	
 
 	def get(self,request,pk):
+
 		notes   = self.get_object(pk=pk)
 		return Response(notes)
 
@@ -90,7 +101,9 @@ class NoteList(APIView):
 	permission_classes = (IsAuthenticated,)
 
 	def get(self,request,format=None):
+		#Get the token for the requested user
 		token,created = Token.objects.get_or_create(user=self.request.user)
+		#Collect the json file storing the note for the user
 		file=open(os.getcwd()+"/static/"+self.request.user.username+".json","r")
 		file_data=json.load(file)
 		return Response({"objects":file_data})
@@ -109,7 +122,7 @@ class NoteList(APIView):
 			data['creater']=token.key
 			translated_data['creater']=token.key
 
-			#For translation
+			#For translation of note
 			x=translated_data['name']
 			y=translated_data['description']
 
@@ -123,6 +136,7 @@ class NoteList(APIView):
 			file_data=json.load(file)
 			trans_id=0
 
+			#Storing id for each note
 			if len(file_data)==0:
 				data['id']=1
 				trans_id=1
@@ -176,12 +190,8 @@ class NoteDetailView(APIView):
 		file_data=json.load(file)
 		file.close()
 
-
-		file_translation=open(os.getcwd()+"/static/"+self.request.user.username+"_translation.json","r")
-		file_data_translation=json.load(file)
-		file.close()
-
 		data_changed={"message":"No data found"}
+		#Change the file for each
 		for i in file_data:
 			if i['id']==int(pk):
 				i['description']=request.data.get("description")
@@ -193,6 +203,11 @@ class NoteDetailView(APIView):
 		json.dump(file_data,file,indent=4)
 		file.close()
 
+
+		#Translation Pattern
+		file_translation=open(os.getcwd()+"/static/"+self.request.user.username+"_translation.json","r")
+		file_data_translation=json.load(file)
+		file.close()
 		y=request.data.get("description")
 		x=request.data.get("name")
 
@@ -221,6 +236,7 @@ class NoteDetailView(APIView):
 		file=open(os.getcwd()+"/static/"+self.request.user.username+"_translation.json","r")
 		file_data=json.load(file)
 		file.close()
+		#Write all files to the already existing file and rejected the file deleted
 		x = list(filter(lambda x : x['id']!=int(pk),file_data))
 		file=open(os.getcwd()+"/static/"+self.request.user.username+"_translation.json","r")
 		json.dump(x,file,indent=4)
