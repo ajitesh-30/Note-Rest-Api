@@ -63,6 +63,7 @@ class Login(APIView):
 		password = request.data.get('password')
 		try:
 			user_obj = authenticate(username=username,password=password)
+			print('here')
 			if user_obj:
 				#Token creation for each logged in user
 				token,created = Token.objects.get_or_create(user=user_obj)
