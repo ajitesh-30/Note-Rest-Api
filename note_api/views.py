@@ -19,6 +19,7 @@ import functools
 
 
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"]=os.getcwd()+"/translate.json"
+translate_client = translate.Client()
 class Register(APIView):
 
 	permission_classes = (AllowAny,)
@@ -36,7 +37,10 @@ class Register(APIView):
 					return Response({"message":"This user already exists","flag":False},status=status.HTTP_400_BAD_REQUEST)
 				user = User.objects.create_user(username=username,password=password1)
 				user.is_active=True
-				with open(user.username+".json", "w") as write_file:
+				with open(os.getcwd()+"/static/"+user.username+".json", "w") as write_file:
+				    json.dump([], write_file)
+
+				with open(os.getcwd()+"/static/"+user.username+"_translation.json", "w") as write_file:
 				    json.dump([], write_file)
 				return Response({"message":"User Created","flag":True},status=status.HTTP_201_CREATED)
 			except:
@@ -68,7 +72,7 @@ class Translation(APIView):
 
 	def get_object(self,pk):
 		try:
-			file=open("/static/"self.request.user.username+".json","r")
+			file=open(os.getcwd()+"/static/"+self.request.user.username+"_translation.json","r")
 			file_data=json.load(file)
 			x = filter(lambda x : x['id']==int(pk),file_data) 
 			file.close()
@@ -77,18 +81,8 @@ class Translation(APIView):
 			return {"message":"Note Does Not Exists"}	
 
 	def get(self,request,pk):
-		translate_client = translate.Client()
-		serializer   = self.get_object(pk=pk)
-		#serializer = NoteSerializer(notes).data
-		x=serializer['name']
-		y=serializer['description']
-		target='hi'
-		translated_description = translate_client.translate(y,target_language='hi')
-		serializer['description']=translated_description['translatedText']
-		translated_description = translate_client.translate(x,target_language='hi')
-		serializer['name']=translated_description['translatedText']
-		return Response(serializer)
-
+		notes   = self.get_object(pk=pk)
+		return Response(notes)
 
 class NoteList(APIView):
 
@@ -97,7 +91,7 @@ class NoteList(APIView):
 
 	def get(self,request,format=None):
 		token,created = Token.objects.get_or_create(user=self.request.user)
-		file=open("/static/"self.request.user.username+".json","r")
+		file=open(os.getcwd()+"/static/"+self.request.user.username+".json","r")
 		file_data=json.load(file)
 		return Response({"objects":file_data})
 
@@ -107,6 +101,7 @@ class NoteList(APIView):
 		if serializer.is_valid():
 			data=dict()
 			translated_data=dict()
+
 			token,created = Token.objects.get_or_create(user=self.request.user)
 			data.update(serializer.data)
 			translated_data.update(serializer.data)
@@ -115,28 +110,43 @@ class NoteList(APIView):
 			translated_data['creater']=token.key
 
 			#For translation
-			x=serializer['name']
-			y=serializer['description']
+			x=translated_data['name']
+			y=translated_data['description']
 
 			translated_description = translate_client.translate(y,target_language='hi')
-			serializer['description']=translated_description['translatedText']
+			translated_data['description']=translated_description['translatedText']
 
 			translated_description = translate_client.translate(x,target_language='hi')
-			serializer['name']=translated_description['translatedText']
+			translated_data['name']=translated_description['translatedText']
 
-			file=open("/static/"self.request.user.username+".json","r")
+			file=open(os.getcwd()+"/static/"+self.request.user.username+".json","r")
 			file_data=json.load(file)
+			trans_id=0
 
 			if len(file_data)==0:
 				data['id']=1
+				trans_id=1
 			else:
 				data['id']=int(file_data[-1]['id'])+1
+				trans_id=int(file_data[-1]['id'])+1
 
 			file_data.append(data)
 			file.close()
-			file=open("/static/"self.request.user.username+".json","w")
+			#Translation_Data
+			file_translation=open(os.getcwd()+"/static/"+self.request.user.username+"_translation.json","r")
+			file_data_translation=json.load(file_translation)
+			translated_data['id']=trans_id
+			file_data_translation.append(translated_data)
+			file_translation.close()
+
+			file=open(os.getcwd()+"/static/"+self.request.user.username+".json","w")
 			json.dump(file_data,file,indent=4)
 			file.close()			
+
+			#Translation_Data
+			file=open(os.getcwd()+"/static/"+self.request.user.username+"_translation.json","w")
+			json.dump(file_data_translation,file,indent=4)
+			file.close()
 			return Response(serializer.data,status=status.HTTP_201_CREATED)
 		return Response(serializer.errors,status=status.HTTP_400_BAD_REQUEST)
 
@@ -147,7 +157,7 @@ class NoteDetailView(APIView):
 
 	def get_object(self,pk):
 		try:
-			file=open("/static/"self.request.user.username+".json","r")
+			file=open(os.getcwd()+"/static/"+self.request.user.username+".json","r")
 			file_data=json.load(file)
 			x = filter(lambda x : x['id']==int(pk),file_data) 
 			file.close()
@@ -161,9 +171,16 @@ class NoteDetailView(APIView):
 
 	def patch(self,request,pk,format=None):
 		token,created = Token.objects.get_or_create(user=request.user)
-		file=open(self.request.user.username+".json","r")
+		
+		file=open(os.getcwd()+"/static/"+self.request.user.username+".json","r")
 		file_data=json.load(file)
 		file.close()
+
+
+		file_translation=open(os.getcwd()+"/static/"+self.request.user.username+"_translation.json","r")
+		file_data_translation=json.load(file)
+		file.close()
+
 		data_changed={"message":"No data found"}
 		for i in file_data:
 			if i['id']==int(pk):
@@ -171,17 +188,41 @@ class NoteDetailView(APIView):
 				i['name']=request.data.get("name")
 				data_changed=i
 				break
-		file=open(self.request.user.username+".json","w")
+		
+		file=open(os.getcwd()+"/static/"+self.request.user.username+".json","w")
 		json.dump(file_data,file,indent=4)
-		file.close()				
+		file.close()
+
+		y=request.data.get("description")
+		x=request.data.get("name")
+
+		for i in file_data_translation:
+			if i['id']==int(pk):
+				translated_description = translate_client.translate(y,target_language='hi')
+				i['description']=translated_description['translatedText']
+				translated_description = translate_client.translate(x,target_language='hi')
+				i['name']=translated_description['translatedText']
+		
+		file=open(os.getcwd()+"/static/"+self.request.user.username+"_translation.json","w")
+		json.dump(file_data_translation,file,indent=4)
+		file.close()
+
 		return Response(data_changed,status=status.HTTP_400_BAD_REQUEST)
 	
 	def delete(self,request,pk,format=None):
-		file=open(self.request.user.username+".json","r")
+		file=open(os.getcwd()+"/static/"+self.request.user.username+".json","r")
 		file_data=json.load(file)
 		file.close()
 		x = list(filter(lambda x : x['id']!=int(pk),file_data))
-		file=open("/static/"self.request.user.username+".json","r")
+		file=open(os.getcwd()+"/static/"+self.request.user.username+".json","r")
 		json.dump(x,file,indent=4)
-		file.close()				
+		file.close()
+
+		file=open(os.getcwd()+"/static/"+self.request.user.username+"_translation.json","r")
+		file_data=json.load(file)
+		file.close()
+		x = list(filter(lambda x : x['id']!=int(pk),file_data))
+		file=open(os.getcwd()+"/static/"+self.request.user.username+"_translation.json","r")
+		json.dump(x,file,indent=4)
+		file.close()						
 		return Response(status=status.HTTP_204_NO_CONTENT)
