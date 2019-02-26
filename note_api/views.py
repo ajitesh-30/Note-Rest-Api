@@ -17,6 +17,7 @@ from .serializers import NoteSerializer
 from .models import Note
 import functools
 
+
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"]=os.getcwd()+"/translate.json"
 class Register(APIView):
 
@@ -67,22 +68,24 @@ class Translation(APIView):
 
 	def get_object(self,pk):
 		try:
-			return Note.objects.get(pk=pk)
-		except Note.DoesNotExist:
-			raise Http404	
+			file=open("/static/"self.request.user.username+".json","r")
+			file_data=json.load(file)
+			x = filter(lambda x : x['id']==int(pk),file_data) 
+			file.close()
+			return list(x)[0]
+		except :
+			return {"message":"Note Does Not Exists"}	
 
 	def get(self,request,pk):
 		translate_client = translate.Client()
-		notes   = self.get_object(pk=pk)
-		serializer = NoteSerializer(notes).data
+		serializer   = self.get_object(pk=pk)
+		#serializer = NoteSerializer(notes).data
 		x=serializer['name']
 		y=serializer['description']
 		target='hi'
 		translated_description = translate_client.translate(y,target_language='hi')
-		print(translated_description)
 		serializer['description']=translated_description['translatedText']
 		translated_description = translate_client.translate(x,target_language='hi')
-		print(translated_description)	
 		serializer['name']=translated_description['translatedText']
 		return Response(serializer)
 
@@ -94,7 +97,7 @@ class NoteList(APIView):
 
 	def get(self,request,format=None):
 		token,created = Token.objects.get_or_create(user=self.request.user)
-		file=open(self.request.user.username+".json","r")
+		file=open("/static/"self.request.user.username+".json","r")
 		file_data=json.load(file)
 		return Response({"objects":file_data})
 
@@ -103,15 +106,35 @@ class NoteList(APIView):
 		data = request.data
 		if serializer.is_valid():
 			data=dict()
+			translated_data=dict()
 			token,created = Token.objects.get_or_create(user=self.request.user)
 			data.update(serializer.data)
+			translated_data.update(serializer.data)
+
 			data['creater']=token.key
-			file=open(self.request.user.username+".json","r")
+			translated_data['creater']=token.key
+
+			#For translation
+			x=serializer['name']
+			y=serializer['description']
+
+			translated_description = translate_client.translate(y,target_language='hi')
+			serializer['description']=translated_description['translatedText']
+
+			translated_description = translate_client.translate(x,target_language='hi')
+			serializer['name']=translated_description['translatedText']
+
+			file=open("/static/"self.request.user.username+".json","r")
 			file_data=json.load(file)
-			data['id']=len(file_data)+1
+
+			if len(file_data)==0:
+				data['id']=1
+			else:
+				data['id']=int(file_data[-1]['id'])+1
+
 			file_data.append(data)
 			file.close()
-			file=open(self.request.user.username+".json","w")
+			file=open("/static/"self.request.user.username+".json","w")
 			json.dump(file_data,file,indent=4)
 			file.close()			
 			return Response(serializer.data,status=status.HTTP_201_CREATED)
@@ -124,7 +147,7 @@ class NoteDetailView(APIView):
 
 	def get_object(self,pk):
 		try:
-			file=open(self.request.user.username+".json","r")
+			file=open("/static/"self.request.user.username+".json","r")
 			file_data=json.load(file)
 			x = filter(lambda x : x['id']==int(pk),file_data) 
 			file.close()
@@ -137,7 +160,6 @@ class NoteDetailView(APIView):
 		return Response(notes)
 
 	def patch(self,request,pk,format=None):
-		serializer = self.get_object(pk=pk)
 		token,created = Token.objects.get_or_create(user=request.user)
 		file=open(self.request.user.username+".json","r")
 		file_data=json.load(file)
@@ -155,6 +177,11 @@ class NoteDetailView(APIView):
 		return Response(data_changed,status=status.HTTP_400_BAD_REQUEST)
 	
 	def delete(self,request,pk,format=None):
-		note = self.get_object(pk)
-		note.delete()
+		file=open(self.request.user.username+".json","r")
+		file_data=json.load(file)
+		file.close()
+		x = list(filter(lambda x : x['id']!=int(pk),file_data))
+		file=open("/static/"self.request.user.username+".json","r")
+		json.dump(x,file,indent=4)
+		file.close()				
 		return Response(status=status.HTTP_204_NO_CONTENT)
