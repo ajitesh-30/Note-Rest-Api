@@ -21,7 +21,7 @@ import functools
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"]=os.getcwd()+"/translate.json"
 translate_client = translate.Client()
 
-#Creating New User
+#API Endpoint for Creating  New User  ( api/signup)
 class Register(APIView):
 
 	permission_classes = (AllowAny,)
@@ -73,6 +73,7 @@ class Login(APIView):
 		except:
 			return Response({"message":"Something Went Wrong"},status=status.HTTP_400_BAD_REQUEST)
 
+#Endpoint for Translation from one view to another
 class Translation(APIView):
 
 	authentication_classes = (TokenAuthentication,)
